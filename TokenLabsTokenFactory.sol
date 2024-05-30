@@ -14,10 +14,10 @@ contract TokenLabsTokenFactory is Ownable(msg.sender) {
 
     function setCreationFee(uint256 _fee) public onlyOwner { creationFee = _fee; }
 
-    function createToken(string memory name, string memory symbol, uint256 initialSupply, string memory imageUrl, bool isRenonced, bool isMintable) public payable returns (address newTokenAddress){
+    function createToken(string memory name, string memory symbol, uint256 initialSupply, string memory imageUrl, bool isMintable) public payable returns (address newTokenAddress){
         require(msg.value >= creationFee, "Creation fee is not met");
 
-        bool isBurnable = true; isRenonced = true;
+        bool isBurnable = true;
 
         ERCToken newToken = new ERCToken(name, symbol, msg.sender, initialSupply); // Ajustar el constructor de ERCToken
         
