@@ -28,8 +28,8 @@ contract TokenLabsLaunchpadFactory is Ownable, ReentrancyGuard {
         uint256 hardcap; 
         uint256 startTime; 
         uint256 endTime; 
-        uint256 tokensPerEth; 
-        uint256 tokensPerEthListing; 
+        uint256 tokensPerWei; 
+        uint256 tokensPerWeiListing; 
         bool limitPerAccountEnabled; 
         uint256 limitPerAccount; 
         address pairingToken; 
@@ -47,7 +47,7 @@ contract TokenLabsLaunchpadFactory is Ownable, ReentrancyGuard {
 
         _feeReceiver.transfer(msg.value);
 
-        uint256 tokenAmountForSale = ((params.softcap + params.hardcap) / 1e18 * params.tokensPerEth) + (params.hardcap / 1e18 * params.tokensPerEthListing) + params.rewardPool;
+        uint256 tokenAmountForSale = (params.hardcap * params.tokensPerWei) + (params.hardcap * params.tokensPerWeiListing) + params.rewardPool;
         IERC20(address(params.token)).safeTransferFrom(params.seller, address(this), tokenAmountForSale);
 
         SaleContract newSale = new SaleContract(params, _router, _weth);
@@ -75,8 +75,8 @@ contract SaleContract is ReentrancyGuard {
         uint256 hardcap; 
         uint256 startTime; 
         uint256 endTime; 
-        uint256 tokensPerEth; 
-        uint256 tokensPerEthListing; 
+        uint256 tokensPerWei; 
+        uint256 tokensPerWeiListing; 
         uint256 collectedETH; 
         bool limitPerAccountEnabled; 
         uint256 limitPerAccount; 
@@ -98,7 +98,7 @@ contract SaleContract is ReentrancyGuard {
     address public weth;
 
     constructor(TokenLabsLaunchpadFactory.SaleParams memory params, IUniswapV2Router02 _dexRouter, address _weth) {
-        sale = Sale(params.seller, params.token, params.softcap, params.hardcap, params.startTime, params.endTime, params.tokensPerEth, params.tokensPerEthListing, 0, params.limitPerAccountEnabled, params.limitPerAccount, params.referralRewardPercentage, params.rewardPool);
+        sale = Sale(params.seller, params.token, params.softcap, params.hardcap, params.startTime, params.endTime, params.tokensPerWei, params.tokensPerWeiListing, 0, params.limitPerAccountEnabled, params.limitPerAccount, params.referralRewardPercentage, params.rewardPool);
         additionalSaleDetails = AdditionalSaleDetails(params.pairingToken);
         dexRouter = _dexRouter;
         admins[msg.sender] = true;
@@ -142,7 +142,7 @@ contract SaleContract is ReentrancyGuard {
             purchaseAmount -= excessAmount;
         }
 
-        uint256 amountOfTokens = (purchaseAmount / 1e18) * sale.tokensPerEth;
+        uint256 amountOfTokens = (purchaseAmount) * sale.tokensPerWei;
         require(amountOfTokens > 0, "Not enough amount for tokens");
 
         tokenAmounts[msg.sender] += amountOfTokens;
@@ -180,15 +180,15 @@ contract SaleContract is ReentrancyGuard {
         liquidityETH = (excessETH > 0) ? sale.hardcap : liquidityETH;
 
         if (sale.collectedETH >= sale.softcap && sale.collectedETH < sale.hardcap) {
-            uint256 remainingEth = (sale.hardcap - sale.collectedETH) / 1e18;
-            uint256 remainingTokens = (remainingEth * sale.tokensPerEthListing);
+            uint256 remainingEth = (sale.hardcap - sale.collectedETH);
+            uint256 remainingTokens = (remainingEth * sale.tokensPerWeiListing);
             ERC20Burnable token = ERC20Burnable(address(sale.token));
             token.burn(remainingTokens);
         }
 
         if (excessETH > 0) sale.seller.transfer(excessETH);
 
-        uint256 liquidityToken = (liquidityETH / 1e18) * sale.tokensPerEthListing;
+        uint256 liquidityToken = (liquidityETH) * sale.tokensPerWeiListing;
         if (additionalSaleDetails.pairingToken == address(0)) {
             addLiquidityToDEX(liquidityToken, liquidityETH);
         } else {
@@ -230,9 +230,9 @@ contract SaleContract is ReentrancyGuard {
     function getContractETHBalance() public view returns (uint256) { return address(this).balance; }
     function getSellerAddress() public view returns (address payable) { return sale.seller; }
     function getLiquidityETH() public view returns (uint256) { return sale.collectedETH; }
-    function getLiquidityTokenAmount() public view returns (uint256) { return (sale.collectedETH == 0) ? 0 : ((sale.collectedETH > sale.hardcap ? sale.hardcap : sale.collectedETH) / 1e18) * sale.tokensPerEthListing; }
+    function getLiquidityTokenAmount() public view returns (uint256) { return (sale.collectedETH == 0) ? 0 : ((sale.collectedETH > sale.hardcap ? sale.hardcap : sale.collectedETH)) * sale.tokensPerWeiListing; }
     function getTokenContract() public view returns (IERC20) { return sale.token; }
-    function getTokensPerEth() public view returns (uint256) { return sale.tokensPerEth; }
-    function getTokensPerEthListing() public view returns (uint256) { return sale.tokensPerEthListing; }
+    function getTokensPerWei() public view returns (uint256) { return sale.tokensPerWei; }
+    function getTokensPerWeiListing() public view returns (uint256) { return sale.tokensPerWeiListing; }
     function getContributions(address user) public view returns (uint256) { return contributions[user]; }
 }
