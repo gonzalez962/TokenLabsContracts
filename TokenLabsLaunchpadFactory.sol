@@ -96,6 +96,7 @@ contract SaleContract is ReentrancyGuard {
     mapping(address => uint256) public referralRewards;
     mapping(address => bool) public admins;
     address public weth;
+    bool public isListed = false;
 
     constructor(TokenLabsLaunchpadFactory.SaleParams memory params, IUniswapV2Router02 _dexRouter, address _weth) {
         sale = Sale(params.seller, params.token, params.softcap, params.hardcap, params.startTime, params.endTime, params.tokensPerWei, params.tokensPerWeiListing, 0, params.limitPerAccountEnabled, params.limitPerAccount, params.referralRewardPercentage, params.rewardPool);
@@ -156,8 +157,9 @@ contract SaleContract is ReentrancyGuard {
             if (referralReward > sale.rewardPool) {
                 referralReward = sale.rewardPool;
             }
+            referralRewards[referrer] += referralReward;
             sale.rewardPool -= referralReward;
-            ERC20Burnable(address(sale.token)).burn(referralReward);
+            
         }
     }
 
@@ -172,6 +174,7 @@ contract SaleContract is ReentrancyGuard {
     }
 
     function endSale() external nonReentrant {
+        require(!isListed, "Tokens were listed");
         require(block.timestamp > sale.endTime || sale.collectedETH >= sale.hardcap, "Sale end conditions not met");
         if (sale.collectedETH < sale.softcap) return;
 
@@ -184,6 +187,7 @@ contract SaleContract is ReentrancyGuard {
             uint256 remainingTokens = (remainingEth * sale.tokensPerWeiListing);
             ERC20Burnable token = ERC20Burnable(address(sale.token));
             token.burn(remainingTokens);
+            ERC20Burnable(address(sale.token)).burn(sale.rewardPool);
         }
 
         if (excessETH > 0) sale.seller.transfer(excessETH);
@@ -197,6 +201,7 @@ contract SaleContract is ReentrancyGuard {
         }
 
         sale.endTime = block.timestamp;
+        isListed = true;
     }
 
     function claim() external nonReentrant {
@@ -208,9 +213,13 @@ contract SaleContract is ReentrancyGuard {
             payable(msg.sender).transfer(ethAmount);
         } else {
             uint256 tokens = tokenAmounts[msg.sender];
-            require(tokens > 0, "No tokens available to claim");
+            uint256 referralReward = referralRewards[msg.sender];
+            uint256 totalTokens = tokens + referralReward;
+
+            require(totalTokens > 0, "No tokens available to claim");
             tokenAmounts[msg.sender] = 0;
-            IERC20(address(sale.token)).safeTransfer(msg.sender, tokens);
+            referralRewards[msg.sender] = 0;
+            IERC20(address(sale.token)).safeTransfer(msg.sender, totalTokens);
         }
     }
 
